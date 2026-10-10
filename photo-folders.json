@@ -1,0 +1,19 @@
+{
+  "folders": {
+    "chudi|Front Neck": "photos/chudi/front-neck",
+    "chudi|Back Neck": "photos/chudi/back-neck",
+    "chudi|Chudi Pattern Cutting": "photos/chudi/pattern-cutting",
+    "chudi|Pant Design": "photos/chudi/pant-design",
+    "blouse|Bridal Collection – Front": "photos/blouse/bridal-collection/front",
+    "blouse|Bridal Collection – Back": "photos/blouse/bridal-collection/back",
+    "blouse|Simple Blouse": "photos/blouse/simple-blouse",
+    "blouse|Aari Work": "photos/blouse/aari-work",
+    "blouse|Designer Blouse – Front": "photos/blouse/design/front",
+    "blouse|Designer Blouse – Back": "photos/blouse/design/back",
+    "blouse|Lace Design": "photos/blouse/lace-design"
+  },
+  "covers": {
+    "chudi": "photos/chudi/cover",
+    "blouse": "photos/blouse/cover"
+  }
+}

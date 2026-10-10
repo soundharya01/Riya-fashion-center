@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6B1A2A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Riya Fashion">
+<meta name="description" content="Riya Fashion Design – Custom stitching, Chudi & Blouse designs catalog">
+<title>Riya Fashion Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="topbar-root"></div>
+<div id="adminbar-root"></div>
+<div id="app"></div>
+<div id="ov"></div>
+<div id="toast"></div>
+
+<script id="st" type="application/json">{"designs":[]}</script>
+<script>
+/* ─── Helpers ─── */
+const $=s=>document.querySelector(s);
+const el=(tag,cls,txt,kids)=>{
+  const e=document.createElement(tag);
+  if(cls)e.className=cls;
+  if(txt!=null)e.textContent=txt;
+  (kids||[]).forEach(k=>k&&e.append(k));
+  return e;
+};
+const btn=(label,cls,fn)=>{const b=el('button',cls||'mbtn',label);b.onclick=fn;return b};
+const svg_trash=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>`;
+
+/* ─── Category & design data ─── */
+const CATS=[
+  {id:'chudi',n:'Chudi',g:[
+    ['Front Neck','Round front neck|V front neck|Square front neck|Boat front neck|Sweetheart front neck|High neck|Collar neck|Keyhole front neck|Princess cut front'],
+    ['Back Neck','Round back neck|Deep U back|V back neck|Square back neck|Keyhole back|Butterfly back|Backless with strings|Dori back|Button back'],
+    ['Chudi Pattern Cutting','Straight cut chudi|Anarkali cut|A-line cut|Peplum cut|Short chudi|Long chudi with slit|Angrakha style|Side-slit cut|Frock style chudi'],
+    ['Pant Design','Simple pant|Palazzo pant|Cigarette pant|Patiala pant|Straight pant|Churidar pant|Sharara pant|Wide-leg pant'],
+  ]},
+  {id:'blouse',n:'Blouse',g:[
+    ['Bridal Collection – Front','Bridal front 1|Bridal front 2|Bridal front 3|Bridal front 4'],
+    ['Bridal Collection – Back', 'Bridal back 1|Bridal back 2|Bridal back 3|Bridal back 4'],
+    ['Simple Blouse','Round front neck|Boat neck|V neck|Square neck|Sweetheart neck|High neck|Keyhole front|Collar neck|Halter neck|Round back neck|Deep U back|V back neck|Square back neck|Boat back|Backless with strings|Button back|Dori back|Keyhole back'],
+    ['Aari Work','Floral aari|Peacock aari|Mango / paisley aari|Bridal border aari|Sleeve aari|Neckline aari|Full blouse aari|Kundan aari|Zari aari'],
+    ['Designer Blouse – Front','Designer front neck|Stone & bead work front|Mirror work front|Embroidery front|Zardosi front|Lace panel front|Net yoke front|Contrast patch front'],
+    ['Designer Blouse – Back','Designer back neck|Stone & bead back|Butterfly back design|Mirror work back|Embroidery back|Open back design|Tassel / latkan back|Silk border back'],
+    ['Lace Design','Full lace blouse|Lace border neck|Lace sleeves|Lace yoke|Lace back panel|Lace hem border|Mixed lace & cloth|Net with lace'],
+  ]},
+];
+
+/* ── Static cover photos (fallback when server not running) ── */
+const CAT_COVERS={
+  'chudi' :'photos/chudi/image.png',
+  'blouse':'photos/blouse/cover/image.png',
+};
+
+/* ── Photo cache: filled by loadAllPhotos() from server API ── */
+/* Key: "catId|Subcategory Name"  Value: [{n, src}, …]         */
+let PHOTO_CACHE = {};
+let COVER_CACHE = {};   /* key: catId, value: src string        */
+let SERVER_MODE = false; /* true when running via node server.js */
+let STATIC_PHOTO_MODE = false;
+const assetBase=new URL('.',document.baseURI);
+
+function numberPhotos(){
+  let nextPhotoNumber=1;
+  CATS.forEach(category=>category.g.forEach(([group])=>{
+    (PHOTO_CACHE[`${category.id}|${group}`]||[]).forEach(photo=>{
+      photo.n=nextPhotoNumber++;
+    });
+  }));
+}
+
+async function loadAllPhotos() {
+  try {
+    const test = await fetch(new URL('api/covers',assetBase), { cache:'no-store' });
+    if (!test.ok) throw new Error('Photo API unavailable');
+    SERVER_MODE = true;
+    COVER_CACHE = await test.json();
+    /* pre-fetch all subcategory photo lists */
+    const keys = CATS.flatMap(category =>
+      category.g.map(([group]) => `${category.id}|${group}`)
+    );
+    await Promise.all(keys.map(async key => {
+      const [cat, grp] = key.split('|');
+      const r = await fetch(new URL(`api/photos?cat=${encodeURIComponent(cat)}&grp=${encodeURIComponent(grp)}`,assetBase),{cache:'no-store'});
+      PHOTO_CACHE[key] = await r.json();
+    }));
+    numberPhotos();
+    return;
+  } catch(e) {}
+  SERVER_MODE=false;
+  try {
+    const response=await fetch(new URL('photos.json',assetBase),{cache:'no-store'});
+    if(!response.ok)throw new Error('Static photo manifest unavailable');
+    const manifest=await response.json();
+    PHOTO_CACHE=manifest.photos||{};
+    COVER_CACHE=manifest.covers||{};
+    STATIC_PHOTO_MODE=true;
+    numberPhotos();
+  } catch(e) {
+    SERVER_MODE = false;
+    STATIC_PHOTO_MODE = false;
+  }
+}
+
+/* ── Subcategory icons ── */
+const TAMIL_LABELS={
+  'Chudi':'சுடிதார்',
+  'Blouse':'ரவிக்கை',
+  'Bridal Collection – Front':'திருமண ரவிக்கை முன்புறம்',
+  'Bridal Collection – Back':'திருமண ரவிக்கை பின்புறம்',
+  'Front Neck':'முன்புற கழுத்து வடிவம்',
+  'Back Neck':'பின்புற கழுத்து வடிவம்',
+  'Chudi Pattern Cutting':'சுடிதார் வெட்டும் முறை',
+  'Pant Design':'பேன்ட் வடிவமைப்பு',
+  'Simple Blouse':'எளிய ரவிக்கை வடிவமைப்பு',
+  'Aari Work':'ஆரி வேலைப்பாடு',
+  'Designer Blouse – Front':'டிசைனர் ரவிக்கை முன்புறம்',
+  'Designer Blouse – Back':'டிசைனர் ரவிக்கை பின்புறம்',
+  'Lace Design':'லேஸ் வடிவமைப்பு',
+};
+const categoryLabel=name=>TAMIL_LABELS[name]?`${name} · ${TAMIL_LABELS[name]}`:name;
+
+/* ─── App state ─── */
+let S=JSON.parse($('#st').textContent);
+let cur=null;     // current category id
+let subGrp=null;  // current subcategory name (null = show subcategory cards)
+let admin=false;
+let art=null;
+let searchQ='';
+
+/* seed designs on very first load */
+if(!S.seeded){
+  let n=0;
+  CATS.forEach(c=>c.g.forEach(([g,l])=>l.split('|').forEach(x=>
+    S.designs.push({id:'s'+n++,cat:c.id,grp:g,name:x,note:'',imgs:[]})
+  )));
+  S.seeded=1;
+}
+if(!S.cats)S.cats=CATS.map(c=>({id:c.id,n:c.n,g:c.g.map(x=>x[0])}));
+S.designs.forEach(d=>{if(!d.imgs)d.imgs=d.img?[d.img]:[];delete d.img});
+
+try{admin=sessionStorage.getItem('rfc')==='1'}catch(e){}
+try{window.claude&&window.claude.use('artifact').then(a=>{art=a;render()})}catch(e){}
+
+/* ─── Utilities ─── */
+const toast=m=>{const t=$('#toast');t.textContent=m;clearTimeout(toast._t);if(m)toast._t=setTimeout(()=>t.textContent='',3500)};
+const closeModal=()=>$('#ov').innerHTML='';
+function modal(title,body,buttons,extra){
+  closeModal();
+  const box=el('div','modal-box',null,[el('h3',null,title),...body,el('div','modal-row',null,buttons)]);
+  const wrap=el('div','modal-wrap '+(extra||''),null,[box]);
+  wrap.onclick=e=>{if(e.target===wrap)closeModal()};
+  $('#ov').append(wrap);
+}
+async function sha(s){
+  try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+  catch(e){return s}
+}
+function snap(){
+  const cl=document.documentElement.cloneNode(true);
+  cl.querySelector('#app').innerHTML='';
+  cl.querySelector('#ov').innerHTML='';
+  cl.querySelector('#toast').textContent='';
+  cl.querySelector('#topbar-root').innerHTML='';
+  cl.querySelector('#adminbar-root').innerHTML='';
+  cl.querySelector('#st').textContent=JSON.stringify(S).replace(/</g,'\\u003c');
+  return '<!doctype html>\n'+cl.outerHTML;
+}
+async function dl(){
+  try{
+    const d=await window.claude.use('downloads');
+    if(!d)throw 0;
+    await d.save({filename:'index.html',data:snap()});
+    toast('Downloaded ✓  Upload index.html to your hosting.');
+  }catch(e){
+    if(e&&e.code==='declined')return;
+    toast('Download not available in this view');
+  }
+}
+async function saveData(backup){
+  if(!art){toast('Saving works only for the site owner');if(backup)S=JSON.parse(backup);render();return false}
+  toast('Saving…');
+  try{await art.publish(snap());return true}
+  catch(e){toast('Could not save — please try again');if(backup)S=JSON.parse(backup);render();return false}
+}
+function shrink(f){
+  return new Promise((ok,no)=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const s=Math.min(1,800/Math.max(img.width,img.height));
+        const c=document.createElement('canvas');
+        c.width=img.width*s;c.height=img.height*s;
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        ok(c.toDataURL('image/jpeg',.75));
+      };
+      img.onerror=no;img.src=r.result;
+    };
+    r.onerror=no;r.readAsDataURL(f);
+  });
+}
+const coverImg=id=>{const d=S.designs.find(x=>x.cat===id&&x.imgs.length);return d&&d.imgs[0]};
+const waLink=n=>S.phone?'https://wa.me/'+S.phone.replace(/\D/g,'')+'?text='+encodeURIComponent('Hi Riya Fashion Design, I like this design: '+n):null;
+
+/* ─── Top bar ─── */
+function renderTopbar(){
+  const root=$('#topbar-root');root.innerHTML='';
+  const right=el('div','topbar-right');
+  if(cur){
+    right.append(btn('🏠 Home','',()=>{cur=null;subGrp=null;searchQ='';render();scrollTo(0,0)}));
+  }
+  if(admin){
+    right.append(
+      btn('⚙ Settings','',settings),
+      btn('⬇ Download','',dl),
+      btn('Logout','',()=>{admin=false;try{sessionStorage.removeItem('rfc')}catch(e){}render()})
+    );
+  }
+  root.append(el('div','topbar',null,[
+    el('div','topbar-title',null,[el('span',null,'✦ Riya Fashion Design')]),
+    right
+  ]));
+}
+
+/* ─── Admin bar ─── */
+function renderAdminbar(){
+  const root=$('#adminbar-root');root.innerHTML='';
+  if(!admin)return;
+  root.append(el('div','adminbar',null,[
+    el('span',null,'👑 Admin Mode'),
+    btn('+ Add design','',()=>addForm(cur||'chudi')),
+  ]));
+}
+
+/* ─── Main render ─── */
+function render(){
+  renderTopbar();
+  renderAdminbar();
+  const app=$('#app');app.innerHTML='';
+  app.append(buildHero(),buildBreadcrumb());
+  const wrap=el('div','wrap');
+  if(!cur)          wrap.append(buildHome());
+  else if(!subGrp)  wrap.append(buildSubcats());
+  else              wrap.append(buildGallery());
+  wrap.append(buildFooter());
+  app.append(wrap);
+  if(S.phone){
+    const wa=el('a','wa-btn','💬 WhatsApp');
+    wa.href='https://wa.me/'+S.phone.replace(/\D/g,'');
+    wa.target='_blank';
+    app.append(wa);
+  }
+  if(admin&&cur){
+    const fab=el('button','fab','+');
+    fab.title='Add design';
+    fab.onclick=()=>addForm(cur,subGrp||undefined);
+    app.append(fab);
+  }
+}
+
+/* ─── Hero ─── */
+function buildHero(){
+  const div=el('section','hero '+(!cur?'home-hero':'compact-hero'));
+  const inner=el('div','hero-inner');
+  if(cur){
+    inner.append(el('div','hero-copy',null,[
+      el('div','hero-kicker','Custom Stitching · Bridal & Festive Wear'),
+      el('p','hero-title','Riya'),
+      el('p','hero-sub','Fashion Design'),
+      el('div','hero-divider',null,[el('span',null,'✦')]),
+      el('p','hero-tag','Tailored with love, stitched to perfection'),
+    ]));
+    div.append(inner);
+    return div;
+  }
+
+  const copy=el('div','hero-copy');
+  copy.append(el('div','hero-kicker','Custom Stitching · Bridal & Festive Wear'));
+  copy.append(el('p','hero-title','Riya'));
+  copy.append(el('p','hero-sub','Fashion Design'));
+  copy.append(el('div','hero-divider',null,[el('span',null,'✦') ]));
+  copy.append(el('p','hero-tag','Your style, beautifully stitched'));
+  copy.append(btn('Explore collections ↓','hero-cta',()=>$('#app .main-grid')?.scrollIntoView({behavior:'smooth',block:'start'})));
+  inner.append(copy);
+
+  const photoGroups=CATS.flatMap(category=>category.g.map(([group])=>({
+    category,group,photos:PHOTO_CACHE[category.id+'|'+group]||[],
+  })).filter(item=>item.photos.length));
+  const featuredPhotos=photoGroups.flatMap(item=>item.photos.slice(0,2).map((photo,index)=>({
+    ...item,photo,index,
+  }))).slice(0,5);
+  if(featuredPhotos.length){
+    const strip=el('div','hero-featured');
+    const stripHead=el('div','hero-featured-head',null,[
+      el('span',null,'From our photo collections'),
+      el('small',null,'New folder photos appear here automatically'),
+    ]);
+    const stripGrid=el('div','hero-featured-grid');
+    featuredPhotos.forEach(item=>{
+      const tile=el('button','hero-featured-tile');tile.type='button';
+      tile.setAttribute('aria-label',`View ${item.group}, photo ${item.photo.n}`);
+      const img=el('img');img.src=item.photo.src;img.alt=item.group+' design';img.loading='lazy';
+      tile.append(img,el('span','hero-featured-label',item.group));
+      tile.onclick=()=>openStaticGallery(item.photos,item.index);
+      stripGrid.append(tile);
+    });
+    strip.append(stripHead,stripGrid);
+    inner.append(strip);
+  }
+  div.append(inner);
+  return div;
+}
+
+/* ─── Breadcrumb ─── */
+function buildBreadcrumb(){
+  const bc=el('nav','breadcrumb');
+  const home=el('span',null,'Home');
+  home.onclick=()=>{cur=null;subGrp=null;searchQ='';render();scrollTo(0,0)};
+  bc.append(home);
+  if(cur){
+    const c=S.cats.find(x=>x.id===cur);
+    bc.append(el('span','sep',null,[document.createTextNode('›')]));
+    const catCrumb=el('span',null,c.n);
+    catCrumb.onclick=()=>{subGrp=null;render();scrollTo(0,0)};
+    bc.append(catCrumb);
+  }
+  if(subGrp){
+    bc.append(el('span','sep',null,[document.createTextNode('›')]));
+    bc.append(el('span',null,subGrp));
+  }
+  return bc;
+}
+
+/* ─── Home — two main category cards ─── */
+function buildHome(){
+  const wrap=el('div');
+  if(!SERVER_MODE&&!STATIC_PHOTO_MODE)wrap.append(buildServerNotice());
+  wrap.append(el('div','section-head',null,[
+    el('h2',null,'Our Collections'),
+    el('p',null,'Choose a category to explore designs'),
+  ]));
+  const sw=el('div','search-wrap');
+  const si=el('input');si.type='search';si.placeholder='Search designs…';si.value=searchQ;
+  si.oninput=e=>{searchQ=e.target.value;renderSearchResults(wrap,si)};
+  sw.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>`;
+  sw.append(si);
+  wrap.append(sw);
+  wrap.append(el('div','search-results'));
+  const grid=el('div','main-grid');
+  S.cats.forEach(c=>grid.append(buildMainCard(c)));
+  if(admin){
+    const nc=el('div','main-card new-card');
+    nc.append(el('div','main-card-body',null,[
+      el('div','main-card-ic','＋'),
+      el('h3',null,'New Category'),
+    ]));
+    nc.onclick=addColl;
+    grid.append(nc);
+  }
+  wrap.append(grid);
+  return wrap;
+}
+
+function renderSearchResults(container){
+  let div=container.querySelector('.search-results');
+  if(!div){div=el('div','search-results');container.append(div)}
+  div.innerHTML='';
+  const q=searchQ.trim().toLowerCase();
+  if(!q)return;
+  const results=S.designs.filter(d=>d.name.toLowerCase().includes(q)||d.grp.toLowerCase().includes(q));
+  if(!results.length){div.append(el('p',null,'No designs found.'));return}
+  const grid=el('div','gallery-grid');
+  results.forEach(d=>grid.append(buildDesignCard(d)));
+  div.append(el('p',null,`${results.length} result${results.length>1?'s':''} for "${searchQ}"`),grid);
+}
+
+function buildMainCard(c){
+  /* use live server cover, else static fallback */
+  const uploadedCover = coverImg(c.id);
+  const serverCover   = COVER_CACHE[c.id] || null;
+  const staticCover   = CAT_COVERS[c.id];
+  const coverSrc      = uploadedCover || serverCover || staticCover || null;
+  const all=S.designs.filter(d=>d.cat===c.id);
+  const withPhotos=all.filter(d=>d.imgs.length).length;
+  const desc=admin?`${withPhotos}/${all.length} photos`:`${c.g.length} subcategories`;
+  const card=el('div','main-card');
+  if(coverSrc){
+    const cv=el('div','main-card-cover');
+    cv.style.backgroundImage=`url("${coverSrc}")`;
+    card.append(cv);
+  }
+  card.append(el('div','main-card-overlay'));
+  card.append(el('div','main-card-ic tamil-category',TAMIL_LABELS[c.n]||c.n));
+  card.append(el('div','main-card-body',null,[
+    el('h3',null,c.n),
+    el('p',null,desc),
+    el('div','main-card-cta',null,[el('span',null,'Explore Collection →')]),
+  ]));
+  card.onclick=()=>{cur=c.id;subGrp=null;render();scrollTo(0,0)};
+  if(admin){
+    const addB=el('button','adm-add','+');addB.title='Add design';
+    addB.onclick=ev=>{ev.stopPropagation();addForm(c.id)};card.append(addB);
+    const delB=el('button','adm-del');delB.innerHTML=svg_trash;delB.title='Delete category';
+    delB.onclick=ev=>{ev.stopPropagation();
+      modal('Delete category?',[el('p',null,`"${c.n}" and all its designs will be permanently deleted.`)],
+        [btn('Cancel','mbtn',closeModal),btn('Delete','mbtn danger',async()=>{
+          const bk=JSON.stringify(S);S.cats=S.cats.filter(z=>z.id!==c.id);S.designs=S.designs.filter(d=>d.cat!==c.id);
+          closeModal();render();await saveData(bk);
+        })]);
+    };card.append(delB);
+  }
+  return card;
+}
+
+/* ─── Subcategory cards ─── */
+function buildSubcats(){
+  const c=S.cats.find(x=>x.id===cur);
+  const wrap=el('div');
+  wrap.append(btn('← Back to Collections','back-btn',()=>{cur=null;render();scrollTo(0,0)}));
+  wrap.append(el('div','section-head',null,[
+    el('h2',null,categoryLabel(c.n)),
+    el('p',null,'Choose a subcategory to view designs'),
+  ]));
+  if(!SERVER_MODE&&!STATIC_PHOTO_MODE)wrap.append(buildServerNotice());
+  if(admin){
+    const ab=btn('+ Add section','mbtn primary',()=>addSec(c.id));
+    ab.style.cssText='display:block;margin:0 auto 24px';wrap.append(ab);
+  }
+  const grid=el('div','sub-grid');
+  c.g.forEach(gn=>{
+    const designs=S.designs.filter(d=>d.cat===c.id&&d.grp===gn);
+    const withPhotos=designs.filter(d=>d.imgs.length).length;
+    /* also count static photos */
+    const staticCount=(PHOTO_CACHE[c.id+'|'+gn]||[]).length;
+    const countLabel=admin
+      ? `${withPhotos}/${designs.length} photos`
+      : staticCount ? `${staticCount} photos` : `${designs.length} designs`;
+    const cardWrap=el('div','sub-card-wrap');
+    const card=el('div','sub-card');
+    card.append(el('h4',null,gn));
+    if(TAMIL_LABELS[gn])card.append(el('p','sub-card-tamil',TAMIL_LABELS[gn]));
+    card.append(el('p',null,countLabel));
+    card.append(el('div','sub-card-arrow',null,[el('span',null,'View designs →')]));
+    card.onclick=()=>{subGrp=gn;render();scrollTo(0,0)};
+    cardWrap.append(card);
+    if(admin){
+      const delB=el('button','adm-del');delB.innerHTML=svg_trash;delB.title='Delete section';
+      delB.onclick=ev=>{ev.stopPropagation();
+        modal('Delete section?',[el('p',null,`"${gn}" and all its designs will be permanently deleted.`)],
+          [btn('Cancel','mbtn',closeModal),btn('Delete','mbtn danger',async()=>{
+            const bk=JSON.stringify(S);c.g=c.g.filter(z=>z!==gn);
+            S.designs=S.designs.filter(d=>!(d.cat===c.id&&d.grp===gn));
+            closeModal();render();await saveData(bk);
+          })]);
+      };cardWrap.append(delB);
+    }
+    grid.append(cardWrap);
+  });
+  wrap.append(grid);
+  return wrap;
+}
+
+/* ─── Gallery view ─── */
+function buildGallery(){
+  const c=S.cats.find(x=>x.id===cur);
+  const wrap=el('div');
+  wrap.append(btn(`← Back to ${c.n}`,'back-btn',()=>{subGrp=null;render();scrollTo(0,0)}));
+  wrap.append(el('div','section-head',null,[
+    el('h2',null,subGrp),
+    el('p',null,categoryLabel(c.n)),
+  ]));
+  if(!SERVER_MODE&&!STATIC_PHOTO_MODE)wrap.append(buildServerNotice());
+  if(SERVER_MODE){
+    const rb=btn('↻ Refresh photos','mbtn',async()=>{
+      await loadAllPhotos();render();scrollTo(0,0);
+    });
+    rb.style.cssText='display:block;margin:0 auto 16px;font-size:12px;padding:6px 16px';
+    wrap.append(rb);
+  }
+  if(admin){
+    const ab=btn('📷 Add photos to this section','mbtn primary',()=>addForm(cur,subGrp));
+    ab.style.cssText='display:block;margin:0 auto 24px';wrap.append(ab);
+  }
+  const grid=el('div','gallery-grid');
+  /* get photos from server cache (auto-scanned folder) */
+  const staticPhotos = PHOTO_CACHE[cur+'|'+subGrp] || [];
+  if(staticPhotos&&staticPhotos.length){
+    /* render in numbered order — 1,2,3,4 — never repeated */
+    staticPhotos.forEach(p=>{
+      const card=el('div','design-card');
+      /* number badge */
+      const badge=el('div',null,String(p.n));
+      badge.style.cssText=[
+        'position:absolute;top:8px;left:8px;z-index:2',
+        'background:var(--burg);color:var(--gold2)',
+        'font-size:11px;font-weight:600',
+        'min-width:22px;height:22px;border-radius:5px',
+        'display:flex;align-items:center;justify-content:center;padding:0 5px'
+      ].join(';');
+      card.append(badge);
+      const thumb=el('div','design-thumb');
+      const img=el('img');img.src=p.src;img.alt=p.n;img.loading='lazy';
+      thumb.append(img);
+      thumb.onclick=()=>openStaticGallery(staticPhotos,idx);
+      card.append(thumb);
+      const lbl=el('div','design-label');
+      lbl.append(el('strong',null,p.n));
+      const wl=waLink(p.n);
+      if(wl){const a=el('a',null,'Enquire on WhatsApp');a.href=wl;a.target='_blank';lbl.append(a)}
+      card.append(lbl);
+      grid.append(card);
+    });
+  } else {
+    const designs=S.designs.filter(d=>d.cat===cur&&d.grp===subGrp);
+    if(!designs.length){
+      grid.append(el('div','empty-state',null,[
+        el('div','empty-state-icon',null,[el('span',null,'🪡')]),
+        el('p',null,'Designs coming soon — check back later!'),
+      ]));
+    } else {
+      designs.forEach(d=>grid.append(buildDesignCard(d)));
+    }
+  }
+  wrap.append(grid);
+  return wrap;
+}
+
+function buildServerNotice(){
+  return el('p','server-notice',null,[
+    document.createTextNode('To load photos directly from the photos folders, start the local server with '),
+    el('strong',null,'node server.js'),
+    document.createTextNode(' and open '),
+    el('strong',null,'http://localhost:3000'),
+    document.createTextNode('.'),
+  ]);
+}
+
+/* ─── Lightbox for static photos ─── */
+function openStaticGallery(photos,startIdx){
+  let i=startIdx;
+  const im=el('img');
+  const ct=el('small');ct.style.cssText='text-align:center;color:var(--muted)';
+  const show=()=>{im.src=photos[i].src;ct.textContent=`Photo ${i+1} of ${photos.length}`};
+  const btns=[];
+  if(photos.length>1){
+    btns.push(btn('‹ Prev','mbtn',()=>{i=(i+photos.length-1)%photos.length;show()}));
+    btns.push(btn('Next ›','mbtn',()=>{i=(i+1)%photos.length;show()}));
+  }
+  btns.push(btn('Close','mbtn primary',closeModal));
+  modal(photos[i].n,[im,ct],btns,'modal-lbx');
+  show();
+}
+
+/* ─── Design card (for admin-uploaded photos) ─── */
+function buildDesignCard(d){
+  const card=el('div','design-card');
+  const thumbWrap=el('div','design-thumb');
+  if(d.imgs.length){
+    const img=el('img');img.src=d.imgs[0];img.alt=d.name;img.loading='lazy';
+    thumbWrap.append(img);
+    thumbWrap.onclick=()=>openGallery(d,0);
+  } else {
+    thumbWrap.classList.add('placeholder');
+    thumbWrap.innerHTML=`<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>`;
+    thumbWrap.append(el('span',null,'Photos coming soon'));
+  }
+  card.append(thumbWrap);
+  const lbl=el('div','design-label');
+  lbl.append(el('strong',null,d.name));
+  if(d.note)lbl.append(el('span',null,d.note));
+  const wl=d.imgs.length&&waLink(d.name);
+  if(wl){const a=el('a',null,'Enquire on WhatsApp');a.href=wl;a.target='_blank';lbl.append(a)}
+  card.append(lbl);
+  if(admin){
+    if(d.imgs.length){
+      const rm=el('button','design-rm','×');rm.title='Remove photo';
+      rm.onclick=ev=>{ev.stopPropagation();
+        modal('Remove photo?',[el('p',null,'This will remove the first photo from this design.')],
+          [btn('Cancel','mbtn',closeModal),btn('Remove','mbtn danger',async()=>{
+            const bk=JSON.stringify(S);d.imgs.splice(0,1);closeModal();render();await saveData(bk);
+          })]);
+      };card.append(rm);
+    }
+    const fi=el('input');fi.type='file';fi.accept='image/*';fi.multiple=true;fi.hidden=true;
+    fi.onchange=async()=>{
+      if(!fi.files.length)return;
+      const bk=JSON.stringify(S);toast('Adding photos…');
+      try{for(const x of fi.files)d.imgs.push(await shrink(x))}
+      catch(x){toast('Could not read a photo');S=JSON.parse(bk);render();return}
+      render();await saveData(bk);
+    };
+    const pb=el('button','adm-photo-btn',d.imgs.length?'📷 Add more':'📷 Add photos');
+    pb.onclick=()=>fi.click();lbl.append(pb,fi);
+    const xb=el('button','adm-del');
+    xb.style.cssText='position:absolute;bottom:8px;right:8px;width:24px;height:24px;border-radius:50%;border:none;background:#c0392b;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh)';
+    xb.innerHTML=svg_trash;xb.title='Delete design';
+    xb.onclick=ev=>{ev.stopPropagation();
+      modal('Delete design?',[el('p',null,`"${d.name}" and all its photos will be permanently deleted.`)],
+        [btn('Cancel','mbtn',closeModal),btn('Delete','mbtn danger',async()=>{
+          const bk=JSON.stringify(S);S.designs=S.designs.filter(z=>z.id!==d.id);
+          closeModal();render();await saveData(bk);
+        })]);
+    };card.append(xb);
+  }
+  return card;
+}
+
+/* ─── Lightbox for uploaded photos ─── */
+function openGallery(d,i){
+  const im=el('img');
+  const ct=el('small');ct.style.textAlign='center';
+  const show=()=>{im.src=d.imgs[i];ct.textContent=`${i+1} / ${d.imgs.length}`};
+  const btns=[];
+  if(d.imgs.length>1){
+    btns.push(btn('‹','mbtn',()=>{i=(i+d.imgs.length-1)%d.imgs.length;show()}));
+    btns.push(btn('›','mbtn',()=>{i=(i+1)%d.imgs.length;show()}));
+  }
+  if(admin)btns.push(btn('Remove','mbtn danger',async()=>{
+    const bk=JSON.stringify(S);d.imgs.splice(i,1);closeModal();render();await saveData(bk);
+  }));
+  btns.push(btn('Close','mbtn primary',closeModal));
+  modal(d.name,[im,ct],btns,'modal-lbx');
+  show();
+}
+
+/* ─── Footer ─── */
+function buildFooter(){
+  const f=el('footer','site-footer');
+  f.append(el('div','footer-brand','Riya Fashion Design'));
+  f.append(el('div','footer-sub','Custom stitching · Alterations · Bridal & festive wear'));
+  if(!admin){
+    const lb=el('button','footer-login-btn','Admin login');lb.onclick=login;f.append(lb);
+  }
+  return f;
+}
+
+/* ─── Admin: add category ─── */
+function addColl(){
+  const nm=el('input');nm.placeholder='e.g. Saree Blouse';
+  const ic=el('input');ic.value='🧵';ic.maxLength=4;
+  const sc=el('input');sc.value='Designs';
+  modal('New Category',
+    [el('label',null,'Category name'),nm,el('label',null,'Icon (emoji)'),ic,el('label',null,'First section name'),sc],
+    [btn('Cancel','mbtn',closeModal),btn('Create','mbtn primary',async()=>{
+      if(!nm.value.trim()){toast('Please enter a name');return}
+      const bk=JSON.stringify(S),id='c'+Date.now().toString(36);
+      S.cats.push({id,n:nm.value.trim(),ic:ic.value.trim()||'🧵',g:[sc.value.trim()||'Designs']});
+      closeModal();cur=id;subGrp=null;render();scrollTo(0,0);await saveData(bk);
+    })]
+  );nm.focus();
+}
+
+/* ─── Admin: add section ─── */
+function addSec(cid){
+  const c=S.cats.find(x=>x.id===cid);
+  const nm=el('input');nm.placeholder='e.g. Collar Neck';
+  modal('New Section',
+    [el('label',null,'Section name'),nm],
+    [btn('Cancel','mbtn',closeModal),btn('Add','mbtn primary',async()=>{
+      const v=nm.value.trim();
+      if(!v){toast('Please enter a name');return}
+      if(c.g.includes(v)){toast('Section already exists');return}
+      const bk=JSON.stringify(S);c.g.push(v);closeModal();render();await saveData(bk);
+    })]
+  );nm.focus();
+}
+
+/* ─── Admin: add design with photos ─── */
+function addForm(cid,g0){
+  const c=S.cats.find(x=>x.id===cid);
+  if(!c.g.length)c.g.push('Designs');
+  const nm=el('input');nm.placeholder='Design name';
+  const gs=el('select');c.g.forEach(g=>gs.append(new Option(g,g)));
+  if(g0)gs.value=g0;
+  const nt=el('input');nt.placeholder='Fabric, colour or price (optional)';
+  const fi=el('input');fi.type='file';fi.accept='image/*';fi.multiple=true;
+  const pv=el('div');pv.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+  let data=[];
+  fi.onchange=async()=>{
+    data=[];pv.innerHTML='';
+    try{for(const x of fi.files){const u=await shrink(x);data.push(u);const img=el('img');img.src=u;img.style.cssText='width:60px;height:60px;object-fit:cover;border-radius:8px';pv.append(img)}}
+    catch(e){toast('Could not read a photo')}
+  };
+  modal('Add Design to '+c.n,
+    [el('label',null,'Section'),gs,el('label',null,'Design name'),nm,el('label',null,'Details (optional)'),nt,el('label',null,'Photos'),fi,pv],
+    [btn('Cancel','mbtn',closeModal),btn('Add','mbtn primary',async()=>{
+      if(!nm.value.trim()||!data.length){toast('Please add a name and at least one photo');return}
+      const bk=JSON.stringify(S);
+      S.designs.push({id:Date.now().toString(36),cat:cid,grp:gs.value,name:nm.value.trim(),note:nt.value.trim(),imgs:data});
+      closeModal();cur=cid;subGrp=gs.value;render();await saveData(bk);
+    })]
+  );
+}
+
+/* ─── Admin login ─── */
+function login(){
+  const p=el('input');p.type='password';p.placeholder='Password';
+  const go=async()=>{
+    const hs=await sha(p.value),ok=S.pw?hs===S.pw:p.value==='riya123';
+    if(ok){admin=true;try{sessionStorage.setItem('rfc','1')}catch(e){}closeModal();render();toast('Welcome back!')}
+    else toast('Wrong password');
+  };
+  p.onkeydown=e=>{if(e.key==='Enter')go()};
+  modal('Admin Login',[p],[btn('Cancel','mbtn',closeModal),btn('Login','mbtn primary',go)]);
+  p.focus();
+}
+
+/* ─── Admin settings ─── */
+function settings(){
+  const ph=el('input');ph.placeholder='e.g. 919876543210';ph.value=S.phone||'';
+  const pw=el('input');pw.type='password';pw.placeholder='Leave empty to keep current';
+  modal('Settings',
+    [el('label',null,'WhatsApp number (with country code)'),ph,el('label',null,'New admin password'),pw],
+    [btn('Cancel','mbtn',closeModal),btn('Save','mbtn primary',async()=>{
+      const bk=JSON.stringify(S);S.phone=ph.value.trim();
+      if(pw.value)S.pw=await sha(pw.value);
+      closeModal();render();await saveData(bk);
+    })]
+  );
+}
+
+/* ─── Start ─── */
+loadAllPhotos().then(() => render());
+</script>
+</body>
+</html>
