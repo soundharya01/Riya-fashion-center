@@ -1,6 +1,8 @@
 {
   "covers": {
-    "blouse": "photos/blouse/cover/image.png"
+    "blouse": "photos/blouse/cover/image.png",
+    "lehanga": "photos/lehanga/design/image.jpg",
+    "hand-design": "photos/Hand-design/image5.jpg"
   },
   "photos": {
     "chudi|Front Neck": [
@@ -386,21 +388,73 @@
       },
       {
         "n": 92,
-        "src": "photos/blouse/design/back/images15.jpg"
+        "src": "photos/blouse/design/back/image18.jpg"
       },
       {
         "n": 93,
-        "src": "photos/blouse/design/back/imge1.jfif"
+        "src": "photos/blouse/design/back/images15.jpg"
       },
       {
         "n": 94,
-        "src": "photos/blouse/design/back/imge5.jfif"
+        "src": "photos/blouse/design/back/imge1.jfif"
       },
       {
         "n": 95,
+        "src": "photos/blouse/design/back/imge5.jfif"
+      },
+      {
+        "n": 96,
         "src": "photos/blouse/design/back/WhatsApp Image 2026-10-09 at 21.52.03.jpeg"
       }
     ],
-    "blouse|Lace Design": []
+    "blouse|Lace Design": [],
+    "lehanga|Lehanga Designs": [
+      {
+        "n": 97,
+        "src": "photos/lehanga/design/image.jpg"
+      }
+    ],
+    "hand-design|Hand Designs": [
+      {
+        "n": 98,
+        "src": "photos/Hand-design/design/image1.jpg"
+      },
+      {
+        "n": 99,
+        "src": "photos/Hand-design/design/image2.jpg"
+      },
+      {
+        "n": 100,
+        "src": "photos/Hand-design/design/image3.jpg"
+      },
+      {
+        "n": 101,
+        "src": "photos/Hand-design/design/image4.jpg"
+      },
+      {
+        "n": 102,
+        "src": "photos/Hand-design/design/image6.jpg"
+      },
+      {
+        "n": 103,
+        "src": "photos/Hand-design/design/image7.jpg"
+      },
+      {
+        "n": 104,
+        "src": "photos/Hand-design/design/image8.jpg"
+      },
+      {
+        "n": 105,
+        "src": "photos/Hand-design/design/image9.jpg"
+      },
+      {
+        "n": 106,
+        "src": "photos/Hand-design/design/image10.jpg"
+      },
+      {
+        "n": 107,
+        "src": "photos/Hand-design/design/image11.jpg"
+      }
+    ]
   }
 }

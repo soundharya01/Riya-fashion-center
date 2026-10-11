@@ -28,17 +28,25 @@ names are sorted naturally (for example, `image2.jpg` appears before `image10.jp
 
 | Website section | Photo folder |
 | --- | --- |
-| Chudi → Front Neck | `photos/chudi/front-neck/` |
-| Chudi → Back Neck | `photos/chudi/back-neck/` |
+| Chudi → Neck Design (Front design option) | `photos/chudi/front-neck/` |
+| Chudi → Neck Design (Back design option) | `photos/chudi/back-neck/` |
 | Chudi → Chudi Pattern Cutting | `photos/chudi/pattern-cutting/` |
 | Chudi → Pant Design | `photos/chudi/pant-design/` |
 | Blouse → Bridal Collection – Front | `photos/blouse/bridal-collection/front/` |
 | Blouse → Bridal Collection – Back | `photos/blouse/bridal-collection/back/` |
 | Blouse → Simple Blouse | `photos/blouse/simple-blouse/` |
 | Blouse → Aari Work | `photos/blouse/aari-work/` |
-| Blouse → Designer Blouse – Front | `photos/blouse/design/front/` |
-| Blouse → Designer Blouse – Back | `photos/blouse/design/back/` |
+| Blouse → Designer Blouse (Front design option) | `photos/blouse/design/front/` |
+| Blouse → Designer Blouse (Back design option) | `photos/blouse/design/back/` |
 | Blouse → Lace Design | `photos/blouse/lace-design/` |
+| Lehanga → Lehanga Designs | `photos/lehanga/design/` |
+| Hand Design → Hand Designs | `photos/Hand-design/design/` |
+
+Chudi Neck Design, Bridal Collection, and Designer Blouse each appear as a
+single section card. Open a card and use the Front design / Back design options
+to switch between their respective photo folders.
 
 Use `photos/chudi/cover/` and `photos/blouse/cover/` for the collection cover
-images. Supported formats include JPG/JPEG, PNG, GIF, WebP, JFIF, and BMP.
+images. Lehanga uses its first design photo as its cover, and Hand Design uses
+`photos/Hand-design/image5.jpg`. Supported formats include JPG/JPEG, PNG, GIF,
+WebP, JFIF, and BMP.

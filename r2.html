@@ -51,12 +51,39 @@ const CATS=[
     ['Designer Blouse – Back','Designer back neck|Stone & bead back|Butterfly back design|Mirror work back|Embroidery back|Open back design|Tassel / latkan back|Silk border back'],
     ['Lace Design','Full lace blouse|Lace border neck|Lace sleeves|Lace yoke|Lace back panel|Lace hem border|Mixed lace & cloth|Net with lace'],
   ]},
+  {id:'lehanga',n:'Lehanga',g:[
+    ['Lehanga Designs','Lehanga design'],
+  ]},
+  {id:'hand-design',n:'Hand Design',g:[
+    ['Hand Designs','Hand design'],
+  ]},
 ];
+
+const PAIRED_SECTIONS=[
+  {cat:'chudi',name:'Neck Design',options:[
+    {label:'Front design',group:'Front Neck'},
+    {label:'Back design',group:'Back Neck'},
+  ]},
+  {cat:'blouse',name:'Bridal Collection',options:[
+    {label:'Front design',group:'Bridal Collection – Front'},
+    {label:'Back design',group:'Bridal Collection – Back'},
+  ]},
+  {cat:'blouse',name:'Designer Blouse',options:[
+    {label:'Front design',group:'Designer Blouse – Front'},
+    {label:'Back design',group:'Designer Blouse – Back'},
+  ]},
+];
+const pairedSectionFor=(cat,group)=>PAIRED_SECTIONS.find(section=>
+  section.cat===cat&&section.options.some(option=>option.group===group)
+);
+const pairedSectionLabel=(cat,group)=>pairedSectionFor(cat,group)?.name||group;
 
 /* ── Static cover photos (fallback when server not running) ── */
 const CAT_COVERS={
   'chudi' :'photos/chudi/image.png',
   'blouse':'photos/blouse/cover/image.png',
+  'lehanga':'photos/lehanga/design/image.jpg',
+  'hand-design':'photos/Hand-design/image5.jpg',
 };
 
 /* ── Photo cache: filled by loadAllPhotos() from server API ── */
@@ -113,6 +140,13 @@ async function loadAllPhotos() {
 const TAMIL_LABELS={
   'Chudi':'சுடிதார்',
   'Blouse':'ரவிக்கை',
+  'Lehanga':'லெஹங்கா',
+  'Hand Design':'கை வடிவமைப்பு',
+  'Lehanga Designs':'லெஹங்கா வடிவமைப்புகள்',
+  'Hand Designs':'கை வடிவமைப்புகள்',
+  'Neck Design':'கழுத்து வடிவமைப்பு',
+  'Bridal Collection':'திருமண ரவிக்கை',
+  'Designer Blouse':'டிசைனர் ரவிக்கை',
   'Bridal Collection – Front':'திருமண ரவிக்கை முன்புறம்',
   'Bridal Collection – Back':'திருமண ரவிக்கை பின்புறம்',
   'Front Neck':'முன்புற கழுத்து வடிவம்',
@@ -325,16 +359,16 @@ function buildBreadcrumb(){
   const home=el('span',null,'Home');
   home.onclick=()=>{cur=null;subGrp=null;searchQ='';render();scrollTo(0,0)};
   bc.append(home);
+  const currentCategory=cur?S.cats.find(x=>x.id===cur):null;
   if(cur){
-    const c=S.cats.find(x=>x.id===cur);
     bc.append(el('span','sep',null,[document.createTextNode('›')]));
-    const catCrumb=el('span',null,c.n);
+    const catCrumb=el('span',null,currentCategory.n);
     catCrumb.onclick=()=>{subGrp=null;render();scrollTo(0,0)};
     bc.append(catCrumb);
   }
-  if(subGrp){
+  if(subGrp&&currentCategory.g.length>1){
     bc.append(el('span','sep',null,[document.createTextNode('›')]));
-    bc.append(el('span',null,subGrp));
+    bc.append(el('span',null,pairedSectionLabel(cur,subGrp)));
   }
   return bc;
 }
@@ -390,7 +424,14 @@ function buildMainCard(c){
   const coverSrc      = uploadedCover || serverCover || staticCover || null;
   const all=S.designs.filter(d=>d.cat===c.id);
   const withPhotos=all.filter(d=>d.imgs.length).length;
-  const desc=admin?`${withPhotos}/${all.length} photos`:`${c.g.length} subcategories`;
+  const staticCount=c.g.reduce((total,group)=>
+    total+(PHOTO_CACHE[c.id+'|'+group]||[]).length,0
+  );
+  const desc=admin
+    ? `${withPhotos}/${all.length} photos`
+    : c.g.length===1
+      ? staticCount ? `${staticCount} photos` : `${all.length} designs`
+      : `${c.g.length} subcategories`;
   const card=el('div','main-card');
   if(coverSrc){
     const cv=el('div','main-card-cover');
@@ -404,7 +445,7 @@ function buildMainCard(c){
     el('p',null,desc),
     el('div','main-card-cta',null,[el('span',null,'Explore Collection →')]),
   ]));
-  card.onclick=()=>{cur=c.id;subGrp=null;render();scrollTo(0,0)};
+  card.onclick=()=>{cur=c.id;subGrp=c.g.length===1?c.g[0]:null;render();scrollTo(0,0)};
   if(admin){
     const addB=el('button','adm-add','+');addB.title='Add design';
     addB.onclick=ev=>{ev.stopPropagation();addForm(c.id)};card.append(addB);
@@ -435,29 +476,43 @@ function buildSubcats(){
     ab.style.cssText='display:block;margin:0 auto 24px';wrap.append(ab);
   }
   const grid=el('div','sub-grid');
+  const displayedGroups=[];
+  const seenSections=new Set();
   c.g.forEach(gn=>{
-    const designs=S.designs.filter(d=>d.cat===c.id&&d.grp===gn);
+    const paired=pairedSectionFor(c.id,gn);
+    const key=paired?paired.name:gn;
+    if(seenSections.has(key))return;
+    seenSections.add(key);
+    displayedGroups.push({
+      name:paired?paired.name:gn,
+      groups:paired?paired.options.map(option=>option.group):[gn],
+      paired,
+    });
+  });
+  displayedGroups.forEach(({name,groups,paired})=>{
+    const designs=S.designs.filter(d=>d.cat===c.id&&groups.includes(d.grp));
     const withPhotos=designs.filter(d=>d.imgs.length).length;
-    /* also count static photos */
-    const staticCount=(PHOTO_CACHE[c.id+'|'+gn]||[]).length;
+    const staticCount=groups.reduce((total,group)=>
+      total+(PHOTO_CACHE[c.id+'|'+group]||[]).length,0
+    );
     const countLabel=admin
       ? `${withPhotos}/${designs.length} photos`
       : staticCount ? `${staticCount} photos` : `${designs.length} designs`;
     const cardWrap=el('div','sub-card-wrap');
     const card=el('div','sub-card');
-    card.append(el('h4',null,gn));
-    if(TAMIL_LABELS[gn])card.append(el('p','sub-card-tamil',TAMIL_LABELS[gn]));
+    card.append(el('h4',null,name));
+    if(TAMIL_LABELS[name])card.append(el('p','sub-card-tamil',TAMIL_LABELS[name]));
     card.append(el('p',null,countLabel));
     card.append(el('div','sub-card-arrow',null,[el('span',null,'View designs →')]));
-    card.onclick=()=>{subGrp=gn;render();scrollTo(0,0)};
+    card.onclick=()=>{subGrp=paired?paired.options[0].group:groups[0];render();scrollTo(0,0)};
     cardWrap.append(card);
     if(admin){
       const delB=el('button','adm-del');delB.innerHTML=svg_trash;delB.title='Delete section';
       delB.onclick=ev=>{ev.stopPropagation();
-        modal('Delete section?',[el('p',null,`"${gn}" and all its designs will be permanently deleted.`)],
+        modal('Delete section?',[el('p',null,`"${name}" and all its designs will be permanently deleted.`)],
           [btn('Cancel','mbtn',closeModal),btn('Delete','mbtn danger',async()=>{
-            const bk=JSON.stringify(S);c.g=c.g.filter(z=>z!==gn);
-            S.designs=S.designs.filter(d=>!(d.cat===c.id&&d.grp===gn));
+            const bk=JSON.stringify(S);c.g=c.g.filter(z=>!groups.includes(z));
+            S.designs=S.designs.filter(d=>!(d.cat===c.id&&groups.includes(d.grp)));
             closeModal();render();await saveData(bk);
           })]);
       };cardWrap.append(delB);
@@ -471,12 +526,33 @@ function buildSubcats(){
 /* ─── Gallery view ─── */
 function buildGallery(){
   const c=S.cats.find(x=>x.id===cur);
+  const paired=pairedSectionFor(cur,subGrp);
+  const singleSection=c.g.length===1;
   const wrap=el('div');
-  wrap.append(btn(`← Back to ${c.n}`,'back-btn',()=>{subGrp=null;render();scrollTo(0,0)}));
+  wrap.append(btn(singleSection?'← Back to Collections':`← Back to ${c.n}`,'back-btn',()=>{
+    if(singleSection){cur=null;subGrp=null}
+    else subGrp=null;
+    render();scrollTo(0,0);
+  }));
   wrap.append(el('div','section-head',null,[
-    el('h2',null,subGrp),
-    el('p',null,categoryLabel(c.n)),
+    el('h2',null,paired?paired.name:singleSection?c.n:subGrp),
+    el('p',null,singleSection?'Browse all designs':categoryLabel(c.n)),
   ]));
+  if(paired){
+    const options=el('div','design-view-options');
+    options.setAttribute('role','group');
+    options.setAttribute('aria-label',`${paired.name} designs`);
+    paired.options.forEach(option=>{
+      const selected=option.group===subGrp;
+      const choice=btn(option.label,'design-view-option'+(selected?' is-active':''),()=>{
+        subGrp=option.group;render();scrollTo(0,0);
+      });
+      choice.type='button';
+      choice.setAttribute('aria-pressed',String(selected));
+      options.append(choice);
+    });
+    wrap.append(options);
+  }
   if(!SERVER_MODE&&!STATIC_PHOTO_MODE)wrap.append(buildServerNotice());
   if(SERVER_MODE){
     const rb=btn('↻ Refresh photos','mbtn',async()=>{
@@ -486,6 +562,11 @@ function buildGallery(){
     wrap.append(rb);
   }
   if(admin){
+    if(singleSection){
+      const sectionButton=btn('+ Add section','mbtn',()=>addSec(c.id));
+      sectionButton.style.cssText='display:block;margin:0 auto 16px';
+      wrap.append(sectionButton);
+    }
     const ab=btn('📷 Add photos to this section','mbtn primary',()=>addForm(cur,subGrp));
     ab.style.cssText='display:block;margin:0 auto 24px';wrap.append(ab);
   }

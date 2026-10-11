@@ -10,10 +10,14 @@
     "blouse|Aari Work": "photos/blouse/aari-work",
     "blouse|Designer Blouse – Front": "photos/blouse/design/front",
     "blouse|Designer Blouse – Back": "photos/blouse/design/back",
-    "blouse|Lace Design": "photos/blouse/lace-design"
+    "blouse|Lace Design": "photos/blouse/lace-design",
+    "lehanga|Lehanga Designs": "photos/lehanga/design",
+    "hand-design|Hand Designs": "photos/Hand-design/design"
   },
   "covers": {
     "chudi": "photos/chudi/cover",
-    "blouse": "photos/blouse/cover"
+    "blouse": "photos/blouse/cover",
+    "lehanga": "photos/lehanga/design",
+    "hand-design": "photos/Hand-design"
   }
 }
