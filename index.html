@@ -180,6 +180,73 @@ if(!S.seeded){
 if(!S.cats)S.cats=CATS.map(c=>({id:c.id,n:c.n,g:c.g.map(x=>x[0])}));
 S.designs.forEach(d=>{if(!d.imgs)d.imgs=d.img?[d.img]:[];delete d.img});
 
+function historyData(state=history.state){
+  return state&&typeof state==='object'&&!Array.isArray(state)?state:{};
+}
+function readViewState(state){
+  if(!state||typeof state!=='object')return null;
+  const {cur:categoryId,subGrp:group,searchQ:query}=state;
+  if(categoryId!==null&&typeof categoryId!=='string')return null;
+  if(group!==null&&typeof group!=='string')return null;
+  if(categoryId===null&&group!==null)return null;
+  const category=categoryId===null?null:S.cats.find(item=>item.id===categoryId);
+  if(categoryId!==null&&!category)return null;
+  if(group!==null&&!category.g.includes(group))return null;
+  return {cur:categoryId,subGrp:group,searchQ:typeof query==='string'?query:''};
+}
+const initialHistoryData=historyData();
+const initialView=readViewState(initialHistoryData.rfcView);
+if(initialView){
+  cur=initialView.cur;
+  subGrp=initialView.subGrp;
+  searchQ=initialView.searchQ;
+}
+let viewHistoryIndex=initialView&&Number.isInteger(initialHistoryData.rfcIndex)
+  ?Math.max(0,initialHistoryData.rfcIndex):0;
+function writeViewHistory(replace=false){
+  const state=historyData();
+  const nextIndex=replace?viewHistoryIndex:viewHistoryIndex+1;
+  history[replace?'replaceState':'pushState']({
+    ...state,
+    rfcView:{cur,subGrp,searchQ},
+    rfcIndex:nextIndex,
+  },'');
+  viewHistoryIndex=nextIndex;
+}
+function navigateView(categoryId,group,query=searchQ){
+  const changed=cur!==categoryId||subGrp!==group||searchQ!==query;
+  cur=categoryId;
+  subGrp=group;
+  searchQ=query;
+  if(changed)writeViewHistory();
+  render();
+  scrollTo(0,0);
+}
+function goBackTo(categoryId,group,query=searchQ){
+  if(viewHistoryIndex>0){history.back();return}
+  navigateView(categoryId,group,query);
+}
+writeViewHistory(true);
+window.addEventListener('popstate',event=>{
+  const state=historyData(event.state);
+  const view=readViewState(state.rfcView);
+  if(view){
+    cur=view.cur;
+    subGrp=view.subGrp;
+    searchQ=view.searchQ;
+    viewHistoryIndex=Number.isInteger(state.rfcIndex)?Math.max(0,state.rfcIndex):0;
+  }else{
+    cur=null;
+    subGrp=null;
+    searchQ='';
+    viewHistoryIndex=0;
+  }
+  closeModal();
+  writeViewHistory(true);
+  render();
+  scrollTo(0,0);
+});
+
 try{admin=sessionStorage.getItem('rfc')==='1'}catch(e){}
 try{window.claude&&window.claude.use('artifact').then(a=>{art=a;render()})}catch(e){}
 
@@ -249,7 +316,7 @@ function renderTopbar(){
   const root=$('#topbar-root');root.innerHTML='';
   const right=el('div','topbar-right');
   if(cur){
-    right.append(btn('🏠 Home','',()=>{cur=null;subGrp=null;searchQ='';render();scrollTo(0,0)}));
+    right.append(btn('🏠 Home','',()=>navigateView(null,null,'')));
   }
   if(admin){
     right.append(
@@ -357,13 +424,13 @@ function buildHero(){
 function buildBreadcrumb(){
   const bc=el('nav','breadcrumb');
   const home=el('span',null,'Home');
-  home.onclick=()=>{cur=null;subGrp=null;searchQ='';render();scrollTo(0,0)};
+  home.onclick=()=>navigateView(null,null,'');
   bc.append(home);
   const currentCategory=cur?S.cats.find(x=>x.id===cur):null;
   if(cur){
     bc.append(el('span','sep',null,[document.createTextNode('›')]));
     const catCrumb=el('span',null,currentCategory.n);
-    catCrumb.onclick=()=>{subGrp=null;render();scrollTo(0,0)};
+    catCrumb.onclick=()=>navigateView(cur,null);
     bc.append(catCrumb);
   }
   if(subGrp&&currentCategory.g.length>1){
@@ -383,7 +450,7 @@ function buildHome(){
   ]));
   const sw=el('div','search-wrap');
   const si=el('input');si.type='search';si.placeholder='Search designs…';si.value=searchQ;
-  si.oninput=e=>{searchQ=e.target.value;renderSearchResults(wrap,si)};
+  si.oninput=e=>{searchQ=e.target.value;writeViewHistory(true);renderSearchResults(wrap,si)};
   sw.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>`;
   sw.append(si);
   wrap.append(sw);
@@ -445,7 +512,7 @@ function buildMainCard(c){
     el('p',null,desc),
     el('div','main-card-cta',null,[el('span',null,'Explore Collection →')]),
   ]));
-  card.onclick=()=>{cur=c.id;subGrp=c.g.length===1?c.g[0]:null;render();scrollTo(0,0)};
+  card.onclick=()=>navigateView(c.id,c.g.length===1?c.g[0]:null);
   if(admin){
     const addB=el('button','adm-add','+');addB.title='Add design';
     addB.onclick=ev=>{ev.stopPropagation();addForm(c.id)};card.append(addB);
@@ -465,7 +532,7 @@ function buildMainCard(c){
 function buildSubcats(){
   const c=S.cats.find(x=>x.id===cur);
   const wrap=el('div');
-  wrap.append(btn('← Back to Collections','back-btn',()=>{cur=null;render();scrollTo(0,0)}));
+  wrap.append(btn('← Back to Collections','back-btn',()=>goBackTo(null,null)));
   wrap.append(el('div','section-head',null,[
     el('h2',null,categoryLabel(c.n)),
     el('p',null,'Choose a subcategory to view designs'),
@@ -504,7 +571,7 @@ function buildSubcats(){
     if(TAMIL_LABELS[name])card.append(el('p','sub-card-tamil',TAMIL_LABELS[name]));
     card.append(el('p',null,countLabel));
     card.append(el('div','sub-card-arrow',null,[el('span',null,'View designs →')]));
-    card.onclick=()=>{subGrp=paired?paired.options[0].group:groups[0];render();scrollTo(0,0)};
+    card.onclick=()=>navigateView(cur,paired?paired.options[0].group:groups[0]);
     cardWrap.append(card);
     if(admin){
       const delB=el('button','adm-del');delB.innerHTML=svg_trash;delB.title='Delete section';
@@ -530,9 +597,7 @@ function buildGallery(){
   const singleSection=c.g.length===1;
   const wrap=el('div');
   wrap.append(btn(singleSection?'← Back to Collections':`← Back to ${c.n}`,'back-btn',()=>{
-    if(singleSection){cur=null;subGrp=null}
-    else subGrp=null;
-    render();scrollTo(0,0);
+    goBackTo(singleSection?null:cur,null);
   }));
   wrap.append(el('div','section-head',null,[
     el('h2',null,paired?paired.name:singleSection?c.n:subGrp),
@@ -545,7 +610,7 @@ function buildGallery(){
     paired.options.forEach(option=>{
       const selected=option.group===subGrp;
       const choice=btn(option.label,'design-view-option'+(selected?' is-active':''),()=>{
-        subGrp=option.group;render();scrollTo(0,0);
+        navigateView(cur,option.group);
       });
       choice.type='button';
       choice.setAttribute('aria-pressed',String(selected));
@@ -734,7 +799,7 @@ function addColl(){
       if(!nm.value.trim()){toast('Please enter a name');return}
       const bk=JSON.stringify(S),id='c'+Date.now().toString(36);
       S.cats.push({id,n:nm.value.trim(),ic:ic.value.trim()||'🧵',g:[sc.value.trim()||'Designs']});
-      closeModal();cur=id;subGrp=null;render();scrollTo(0,0);await saveData(bk);
+      closeModal();navigateView(id,null);await saveData(bk);
     })]
   );nm.focus();
 }
@@ -776,7 +841,7 @@ function addForm(cid,g0){
       if(!nm.value.trim()||!data.length){toast('Please add a name and at least one photo');return}
       const bk=JSON.stringify(S);
       S.designs.push({id:Date.now().toString(36),cat:cid,grp:gs.value,name:nm.value.trim(),note:nt.value.trim(),imgs:data});
-      closeModal();cur=cid;subGrp=gs.value;render();await saveData(bk);
+      closeModal();navigateView(cid,gs.value);await saveData(bk);
     })]
   );
 }
